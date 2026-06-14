@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #f0f2f8;
+            --surface:   #ffffff;
+            --border:    #dde1ef;
+            --text:      #1a1d2e;
+            --muted:     #8b90a8;
+            --admin:     #d63031;  --admin-dim:   #fff0f0;
+            --teacher:   #0984e3;  --teacher-dim: #f0f7ff;
+            --student:   #00b894;  --student-dim: #f0fdf9;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background-image: radial-gradient(circle, #c8cde0 1px, transparent 1px);
+            background-size: 28px 28px;
+            opacity: 0.6; z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background: radial-gradient(ellipse 90% 70% at 50% 50%, transparent 30%, var(--bg) 100%);
+            z-index: 0;
+        }
+
+        /* ── Shared Layout ── */
+        .wrapper, .dashboard-container, .student-container {
+            position: relative; z-index: 1;
+            width: 100%; padding: 24px;
+            animation: fadeUp 0.6s ease both;
+        }
+        .wrapper           { max-width: 460px; }
+        .dashboard-container { max-width: 600px; }
+        .student-container { max-width: 640px; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Header ── */
+        .header { text-align: center; margin-bottom: 36px; }
+        .logo { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .logo-icon {
+            width: 38px; height: 38px;
+            background: var(--accent, #0984e3);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(9,132,227,0.25);
+            transition: background 0.4s, box-shadow 0.4s;
+        }
+        .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: var(--text); }
+        .header h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        .header p  { font-size: 14px; color: var(--muted); }
+
+        /* ── Role Cards ── */
+        .role-label { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+        .role-grid  { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 24px; }
+
+        .role-card {
+            border: 1.5px solid var(--border); border-radius: 14px;
+            padding: 18px 10px; text-align: center; cursor: pointer;
+            background: var(--surface); transition: all 0.25s ease;
+            position: relative; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .role-card::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity 0.25s; }
+        .role-card:hover   { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.10); }
+        .role-card.admin::before   { background: var(--admin-dim); }
+        .role-card.teacher::before { background: var(--teacher-dim); }
+        .role-card.student::before { background: var(--student-dim); }
+        .role-card.active.admin    { border-color: var(--admin);   box-shadow: 0 0 0 1px var(--admin),   0 8px 24px rgba(214,48,49,0.12); }
+        .role-card.active.teacher  { border-color: var(--teacher); box-shadow: 0 0 0 1px var(--teacher), 0 8px 24px rgba(9,132,227,0.12); }
+        .role-card.active.student  { border-color: var(--student); box-shadow: 0 0 0 1px var(--student), 0 8px 24px rgba(0,184,148,0.12); }
+        .role-card.active::before  { opacity: 1; }
+        .role-icon { font-size: 24px; margin-bottom: 8px; display: block; position: relative; }
+        .role-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; position: relative; color: var(--muted); transition: color 0.25s; }
+        .role-card.active.admin   .role-name { color: var(--admin); }
+        .role-card.active.teacher .role-name { color: var(--teacher); }
+        .role-card.active.student .role-name { color: var(--student); }
+
+        /* ── Form Card ── */
+        .form-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px; padding: 28px; box-shadow: 0 4px 24px rgba(0,0,0,0.07); }
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+        .input-group input, select {
+            width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px;
+            padding: 12px 16px; font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--text);
+            outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-group input:focus, select:focus { border-color: var(--accent, #0984e3); box-shadow: 0 0 0 3px rgba(9,132,227,0.10); background: #fff; }
+        .input-group input::placeholder { color: #c0c5d8; }
+
+        .login-btn {
+            width: 100%; padding: 14px; border: none; border-radius: 10px;
+            font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+            letter-spacing: 0.04em; cursor: pointer;
+            background: var(--accent, #0984e3); color: #fff;
+            transition: all 0.2s ease; margin-top: 8px;
+            box-shadow: 0 4px 14px rgba(9,132,227,0.30);
+        }
+        .login-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+        .login-btn:active { transform: translateY(0); }
+
+        .role-badge { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding: 8px 14px; border-radius: 8px; background: var(--teacher-dim); border: 1px solid var(--accent, #0984e3); width: fit-content; }
+        .role-badge span { font-size: 13px; font-weight: 600; color: var(--accent, #0984e3); }
+
+        .error-msg { background: #fff5f5; border: 1px solid var(--admin); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--admin); margin-bottom: 16px; display: none; }
+
+        /* ── Dashboard (Teacher/Admin) ── */
+        #dashboardPage { display: none; }
+        .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+        .dash-header h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+        .role-pill { padding: 6px 16px; border-radius: 99px; font-size: 12px; font-weight: 700; font-family: 'Syne', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .option-btn { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 22px 18px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; color: var(--text); cursor: pointer; text-align: left; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .option-btn:hover { border-color: var(--accent, #0984e3); background: var(--role-dim, var(--teacher-dim)); transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+        .session-details { margin-top: 20px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+        .session-details h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+        .session-details .input-group { margin-bottom: 14px; }
+        .session-details .login-btn   { margin-top: 16px; }
+
+        /* ── Student Portal ── */
+        #studentPage { display: none; }
+
+        .student-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 28px;
+        }
+        .student-header h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+
+        .logout-btn {
+            padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--border);
+            background: var(--surface); font-family: 'Syne', sans-serif;
+            font-size: 12px; font-weight: 700; cursor: pointer; color: var(--muted);
+            transition: all 0.2s;
+        }
+        .logout-btn:hover { border-color: var(--admin); color: var(--admin); }
+
+        .student-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+        .tab-btn {
+            padding: 9px 20px; border-radius: 99px; border: 1.5px solid var(--border);
+            background: var(--surface); font-family: 'Syne', sans-serif; font-size: 13px;
+            font-weight: 700; cursor: pointer; color: var(--muted); transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--student); color: #fff; border-color: var(--student);
+            box-shadow: 0 4px 12px rgba(0,184,148,0.25);
+        }
+        .tab-btn:not(.active):hover { border-color: var(--student); color: var(--student); }
+
+        .tab-panel { display: none; animation: fadeUp 0.3s ease both; }
+        .tab-panel.active { display: block; }
+
+        /* Profile Card */
+        .profile-card {
+            background: var(--surface); border: 1.5px solid var(--border);
+            border-radius: 18px; padding: 28px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }
+        .profile-avatar {
+            width: 72px; height: 72px; border-radius: 50%;
+            background: var(--student-dim); border: 3px solid var(--student);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; margin-bottom: 20px;
+        }
+        .profile-name { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+        .profile-role { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+        .profile-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .profile-field { background: var(--bg); border-radius: 10px; padding: 14px 16px; }
+        .profile-field-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+        .profile-field-value { font-size: 15px; font-weight: 500; color: var(--text); }
+
+        /* Attendance Table */
+        .attendance-card {
+            background: var(--surface); border: 1.5px solid var(--border);
+            border-radius: 18px; overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }
+        .attendance-card-header {
+            padding: 20px 24px; border-bottom: 1.5px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .attendance-card-header h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+        .attendance-summary { display: flex; gap: 16px; }
+        .summary-stat { text-align: center; }
+        .summary-stat .stat-num { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--student); }
+        .summary-stat .stat-label { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+
+        .attendance-table { width: 100%; border-collapse: collapse; }
+        .attendance-table th { padding: 12px 24px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--bg); border-bottom: 1.5px solid var(--border); }
+        .attendance-table td { padding: 14px 24px; font-size: 14px; border-bottom: 1px solid var(--border); }
+        .attendance-table tr:last-child td { border-bottom: none; }
+        .attendance-table tr:hover td { background: var(--bg); }
+
+        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; font-family: 'Syne', sans-serif; letter-spacing: 0.04em; }
+        .status-PRESENT  { background: #f0fdf9; color: #00b894; border: 1px solid #00b894; }
+        .status-ABSENT   { background: #fff5f5; color: #d63031; border: 1px solid #d63031; }
+        .status-SLEEPING { background: #fff8f0; color: #e17055; border: 1px solid #e17055; }
+
+        .empty-state { padding: 48px 24px; text-align: center; color: var(--muted); }
+        .empty-state .empty-icon { font-size: 36px; margin-bottom: 12px; }
+        .empty-state p { font-size: 14px; }
+
+        .loading-spinner { padding: 40px; text-align: center; color: var(--muted); font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <!-- ===== LOGIN PAGE ===== -->
+    <div id="loginPage" class="wrapper">
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon" id="logoIcon">🎓</div>
+                <span class="logo-text">AttendIQ</span>
+            </div>
+            <h1>Welcome back</h1>
+            <p>Select your role to continue</p>
+        </div>
+
+        <div class="role-label">Sign in as</div>
+        <div class="role-grid">
+            <div class="role-card admin"   onclick="selectRole('admin')"   id="role-admin">
+                <span class="role-icon">🛡️</span><div class="role-name">Admin</div>
+            </div>
+            <div class="role-card teacher active" onclick="selectRole('teacher')" id="role-teacher">
+                <span class="role-icon">👨‍🏫</span><div class="role-name">Teacher</div>
+            </div>
+            <div class="role-card student" onclick="selectRole('student')" id="role-student">
+                <span class="role-icon">🎒</span><div class="role-name">Student</div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="role-badge" id="roleBadge">
+                <span id="badgeText">👨‍🏫 Signing in as Teacher</span>
+            </div>
+            <div class="error-msg" id="errorMsg">Invalid username or password.</div>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="usernameInput" placeholder="Enter your username" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="passwordInput" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="login-btn" id="loginBtn">Login as Teacher</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== TEACHER / ADMIN DASHBOARD ===== -->
+    <div id="dashboardPage" class="dashboard-container">
+        <div class="dash-header">
+            <h2>Control Panel</h2>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <div class="role-pill" id="dashRolePill">Teacher</div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="options-grid" id="optionsGrid"></div>
+
+        <div id="sessionDetails" class="session-details" style="display: none;">
+            <h3>Session Configuration</h3>
+            <div class="input-group"><label>Program</label><input type="text" id="program" placeholder="e.g., B.Tech CSE"></div>
+            <div class="input-group"><label>Duration (minutes)</label><input type="number" id="duration" placeholder="e.g., 45" min="1" max="120"></div>
+            <button class="login-btn" onclick="startAttendance()">Start Face Recognition</button>
+        </div>
+
+        <div id="attendanceUpdateForm" class="session-details" style="display: none;">
+            <h3>Update Candidate Attendance</h3>
+            <div class="input-group"><label>Roll Number</label><input type="text" id="attendanceRoll" placeholder="Enter roll number"></div>
+            <div class="input-group"><label>Date</label><input type="date" id="attendanceDate"></div>
+            <div class="input-group">
+                <label>Status</label>
+                <select id="attendanceStatus"><option value="Present">Present</option><option value="Absent">Absent</option></select>
+            </div>
+            <button class="login-btn" onclick="submitAttendanceUpdate()">Submit Attendance</button>
+        </div>
+
+        <div id="candidateDetailsForm" class="session-details" style="display: none;">
+            <h3>Update Candidate Details</h3>
+            <div class="input-group"><label>Name</label><input type="text" id="candidateName" placeholder="Enter name"></div>
+            <div class="input-group"><label>Roll Number</label><input type="text" id="candidateRoll" placeholder="Enter roll number"></div>
+            <div class="input-group"><label>Program</label><input type="text" id="candidateProgram" placeholder="Enter program"></div>
+            <button class="login-btn" onclick="submitCandidateDetails()">Submit</button>
+        </div>
+    </div>
+
+    <!-- ===== STUDENT PORTAL ===== -->
+    <div id="studentPage" class="student-container">
+        <div class="student-header">
+            <h2>Student Portal</h2>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="student-tabs">
+            <button class="tab-btn active" onclick="switchTab('attendance')">📋 My Attendance</button>
+            <button class="tab-btn"        onclick="switchTab('profile')">👤 My Profile</button>
+        </div>
+
+        <!-- Attendance Tab -->
+        <div class="tab-panel active" id="tab-attendance">
+            <div class="attendance-card">
+                <div class="attendance-card-header">
+                    <h3>Attendance Record</h3>
+                    <div class="attendance-summary" id="attendanceSummary">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+                <div id="attendanceTableContainer">
+                    <div class="loading-spinner">Loading attendance...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div class="tab-panel" id="tab-profile">
+            <div class="profile-card" id="profileCard">
+                <div class="loading-spinner">Loading profile...</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ── Role Config ───────────────────────────────────────────────
+    const ROLES = {
+        admin: {
+            label: 'Admin', icon: '🛡️',
+            accent: '#d63031', dim: 'rgba(214,48,49,0.07)', shadow: 'rgba(214,48,49,0.20)',
+            buttons: [
+                { label: '▶ Start Session',      fn: 'toggleSession()' },
+                { label: '✏️ Update Attendance', fn: 'showAttendanceUpdateForm()' },
+                { label: '👤 Update Candidate',  fn: 'showCandidateUpdateForm()' },
+                { label: '📊 View Reports',      fn: 'alert("Reports coming soon")' },
+            ]
+        },
+        teacher: {
+            label: 'Teacher', icon: '👨‍🏫',
+            accent: '#0984e3', dim: 'rgba(9,132,227,0.07)', shadow: 'rgba(9,132,227,0.20)',
+            buttons: [
+                { label: '▶ Start Session',      fn: 'toggleSession()' },
+                { label: '✏️ Update Attendance', fn: 'showAttendanceUpdateForm()' },
+                { label: '👤 Update Candidate',  fn: 'showCandidateUpdateForm()' },
+            ]
+        },
+        student: {
+            label: 'Student', icon: '🎒',
+            accent: '#00b894', dim: 'rgba(0,184,148,0.07)', shadow: 'rgba(0,184,148,0.20)',
+        }
+    };
+
+    let currentRole = 'teacher';
+    let loggedInUser = null;   // stores { username, role } after login
+
+    // ── Role Selection ────────────────────────────────────────────
+    function selectRole(role) {
+        currentRole = role;
+        const cfg = ROLES[role];
+        document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
+        document.getElementById('role-' + role).classList.add('active');
+        document.documentElement.style.setProperty('--accent', cfg.accent);
+        document.documentElement.style.setProperty('--role-dim', cfg.dim);
+        document.getElementById('badgeText').textContent = cfg.icon + ' Signing in as ' + cfg.label;
+        document.getElementById('loginBtn').textContent  = 'Login as ' + cfg.label;
+        document.getElementById('logoIcon').textContent  = cfg.icon;
+        document.getElementById('logoIcon').style.background = cfg.accent;
+        document.getElementById('logoIcon').style.boxShadow  = `0 4px 12px ${cfg.shadow}`;
+        document.getElementById('loginBtn').style.boxShadow  = `0 4px 14px ${cfg.shadow}`;
+        const badge = document.getElementById('roleBadge');
+        badge.style.borderColor = cfg.accent;
+        badge.style.background  = cfg.dim;
+        document.getElementById('badgeText').style.color = cfg.accent;
+    }
+    selectRole('teacher');
+
+    // ── Login ─────────────────────────────────────────────────────
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const username = document.getElementById('usernameInput').value;
+        const password = document.getElementById('passwordInput').value;
+        const errorMsg = document.getElementById('errorMsg');
+        errorMsg.style.display = 'none';
+
+        try {
+            const response = await fetch("http://127.0.0.1:8000/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password, role: currentRole })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                loggedInUser = { username: data.username, role: data.role };
+                if (currentRole === 'student') {
+                    showStudentPortal();
+                } else {
+                    showDashboard();
+                }
+            } else {
+                const error = await response.json();
+                errorMsg.textContent = error.detail || 'Invalid credentials.';
+                errorMsg.style.display = 'block';
+            }
+        } catch (err) {
+            // Dev fallback — simulate student login for testing
+            loggedInUser = { username: document.getElementById('usernameInput').value, role: currentRole };
+            if (currentRole === 'student') showStudentPortal();
+            else showDashboard();
+        }
+    });
+
+    // ── Teacher/Admin Dashboard ───────────────────────────────────
+    function showDashboard() {
+        const cfg = ROLES[currentRole];
+        document.getElementById('loginPage').style.display    = 'none';
+        document.getElementById('dashboardPage').style.display = 'block';
+        document.getElementById('studentPage').style.display   = 'none';
+
+        const pill = document.getElementById('dashRolePill');
+        pill.textContent      = cfg.icon + ' ' + cfg.label;
+        pill.style.background = cfg.dim;
+        pill.style.color      = cfg.accent;
+        pill.style.border     = '1.5px solid ' + cfg.accent;
+
+        const grid = document.getElementById('optionsGrid');
+        grid.innerHTML = '';
+        cfg.buttons.forEach(btn => {
+            const b = document.createElement('button');
+            b.className = 'option-btn';
+            b.textContent = btn.label;
+            b.setAttribute('onclick', btn.fn);
+            grid.appendChild(b);
+        });
+    }
+
+    // ── Student Portal ────────────────────────────────────────────
+    function showStudentPortal() {
+        document.getElementById('loginPage').style.display    = 'none';
+        document.getElementById('dashboardPage').style.display = 'none';
+        document.getElementById('studentPage').style.display   = 'block';
+        loadAttendance();
+        loadProfile();
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    // ── Load Attendance ───────────────────────────────────────────
+    async function loadAttendance() {
+        const container = document.getElementById('attendanceTableContainer');
+        const summary   = document.getElementById('attendanceSummary');
+        container.innerHTML = '<div class="loading-spinner">Loading attendance...</div>';
+
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/student/attendance?username=${encodeURIComponent(loggedInUser.username)}`);
+            const data = await response.json();
+            const records = data.records || [];
+
+            if (records.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <p>No attendance records found yet.</p>
+                    </div>`;
+                return;
+            }
+
+            // Calculate summary stats
+            const total    = records.length;
+            const present  = records.filter(r => r.status === 'PRESENT').length;
+            const absent   = records.filter(r => r.status === 'ABSENT').length;
+            const sleeping = records.filter(r => r.status === 'SLEEPING').length;
+            const pct      = Math.round((present / total) * 100);
+
+            summary.innerHTML = `
+                <div class="summary-stat"><div class="stat-num">${pct}%</div><div class="stat-label">Present</div></div>
+                <div class="summary-stat"><div class="stat-num" style="color:#d63031">${absent}</div><div class="stat-label">Absent</div></div>
+                <div class="summary-stat"><div class="stat-num" style="color:#e17055">${sleeping}</div><div class="stat-label">Sleeping</div></div>`;
+
+            // Build table
+            const rows = records.map(r => `
+                <tr>
+                    <td>${r.time || '—'}</td>
+                    <td>${r.program || '—'}</td>
+                    <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+                </tr>`).join('');
+
+            container.innerHTML = `
+                <table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Program</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+
+        } catch (err) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">⚠️</div>
+                    <p>Could not load attendance. Is the server running?</p>
+                </div>`;
+        }
+    }
+
+    // ── Load Profile ──────────────────────────────────────────────
+    async function loadProfile() {
+        const card = document.getElementById('profileCard');
+        card.innerHTML = '<div class="loading-spinner">Loading profile...</div>';
+
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/student/profile?username=${encodeURIComponent(loggedInUser.username)}`);
+            const data = await response.json();
+
+            card.innerHTML = `
+                <div class="profile-avatar">🎒</div>
+                <div class="profile-name">${data.name || loggedInUser.username}</div>
+                <div class="profile-role">Student</div>
+                <div class="profile-fields">
+                    <div class="profile-field">
+                        <div class="profile-field-label">Username</div>
+                        <div class="profile-field-value">${data.username || '—'}</div>
+                    </div>
+                    <div class="profile-field">
+                        <div class="profile-field-label">Roll Number</div>
+                        <div class="profile-field-value">${data.roll || '—'}</div>
+                    </div>
+                    <div class="profile-field">
+                        <div class="profile-field-label">Program</div>
+                        <div class="profile-field-value">${data.program || '—'}</div>
+                    </div>
+                    <div class="profile-field">
+                        <div class="profile-field-label">Total Sessions</div>
+                        <div class="profile-field-value">${data.total_sessions || 0}</div>
+                    </div>
+                </div>`;
+        } catch (err) {
+            card.innerHTML = `
+                <div class="profile-avatar">🎒</div>
+                <div class="profile-name">${loggedInUser.username}</div>
+                <div class="profile-role">Student</div>
+                <div class="profile-fields">
+                    <div class="profile-field">
+                        <div class="profile-field-label">Username</div>
+                        <div class="profile-field-value">${loggedInUser.username}</div>
+                    </div>
+                </div>`;
+        }
+    }
+
+    // ── Logout ────────────────────────────────────────────────────
+    function logout() {
+        loggedInUser = null;
+        document.getElementById('loginPage').style.display    = 'block';
+        document.getElementById('dashboardPage').style.display = 'none';
+        document.getElementById('studentPage').style.display   = 'none';
+        document.getElementById('usernameInput').value = '';
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('errorMsg').style.display = 'none';
+    }
+
+    // ── Teacher/Admin Actions ─────────────────────────────────────
+    function hideAllForms() {
+        document.getElementById('sessionDetails').style.display = 'none';
+        document.getElementById('attendanceUpdateForm').style.display = 'none';
+        document.getElementById('candidateDetailsForm').style.display = 'none';
+    }
+    function toggleSession() {
+        const f = document.getElementById('sessionDetails');
+        f.style.display === 'block' ? (f.style.display='none') : (hideAllForms(), f.style.display='block');
+    }
+    function showAttendanceUpdateForm() {
+        const f = document.getElementById('attendanceUpdateForm');
+        f.style.display === 'block' ? (f.style.display='none') : (hideAllForms(), f.style.display='block');
+    }
+    function showCandidateUpdateForm() {
+        const f = document.getElementById('candidateDetailsForm');
+        f.style.display === 'block' ? (f.style.display='none') : (hideAllForms(), f.style.display='block');
+    }
+
+    async function startAttendance() {
+        const program  = document.getElementById('program').value;
+        const duration = document.getElementById('duration').value;
+        if (!program || !duration) { alert('Fill all fields'); return; }
+        const r = await fetch("http://127.0.0.1:8000/start-attendance", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ program, duration })
+        });
+        alert((await r.json()).message);
+    }
+
+    async function submitAttendanceUpdate() {
+        const roll = document.getElementById('attendanceRoll').value;
+        const date = document.getElementById('attendanceDate').value;
+        const status = document.getElementById('attendanceStatus').value;
+        if (!roll || !date) { alert('Please fill all fields'); return; }
+        const r = await fetch("http://127.0.0.1:8000/update-attendance", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roll, date, status })
+        });
+        alert((await r.json()).message);
+    }
+
+    async function submitCandidateDetails() {
+        const name = document.getElementById('candidateName').value;
+        const roll = document.getElementById('candidateRoll').value;
+        const program = document.getElementById('candidateProgram').value;
+        if (!name || !roll || !program) { alert('Please fill all fields'); return; }
+        const r = await fetch("http://127.0.0.1:8000/update-candidate", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, roll, program })
+        });
+        alert((await r.json()).message);
+    }
+</script>
+</body>
+</html>
